@@ -28,13 +28,13 @@ export default function Home() {
             The collaborative photo platform where everyone becomes the photographer. 
             Create events, share links, and watch memories come alive in real-time.
           </p>
-          {/* <button 
+          <button 
             onClick={handleGetStarted}
             className="group relative inline-flex items-center gap-3 bg-white text-purple-600 px-8 md:px-12 py-4 md:py-5 rounded-full text-lg md:text-xl font-bold hover:bg-yellow-300 transition-all duration-300 transform hover:scale-105 shadow-2xl"
           >
             <span>Get Started</span>
             <Zap className="w-5 h-5 md:w-6 md:h-6 group-hover:rotate-12 transition-transform" />
-          </button> */}
+          </button>
         </div>
 
         {/* Features Grid */}
@@ -74,7 +74,7 @@ export default function Home() {
         </div>
 
         {/* Bottom CTA Section */}
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 md:p-12 border border-white/20 max-w-4xl mx-auto text-center">
+        {/* <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 md:p-12 border border-white/20 max-w-4xl mx-auto text-center">
           <div className="flex justify-center gap-4 mb-6">
             <div className="bg-yellow-300/30 p-3 rounded-full">
               <Camera className="w-6 h-6 md:w-8 md:h-8 text-white" />
@@ -96,9 +96,9 @@ export default function Home() {
             onClick={handleGetStarted}
             className="bg-gradient-to-r from-yellow-300 to-orange-300 text-purple-900 px-8 md:px-12 py-4 md:py-5 rounded-full text-base md:text-xl font-bold hover:from-yellow-400 hover:to-orange-400 transition-all duration-300 transform hover:scale-105 shadow-xl"
           >
-            Start Your First Event
+            Get Started
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* Footer */}

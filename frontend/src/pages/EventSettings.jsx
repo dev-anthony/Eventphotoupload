@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings as SettingsIcon, Lock, HardDrive, Download as DownloadIcon,
-  Clock, Save, ArrowLeft, CheckCircle
+  Clock, Save, ArrowLeft, CheckCircle, Loader
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { eventApi } from '../utils/api';
 
 export default function EventSettings() {
   const { eventId } = useParams();
@@ -20,12 +21,62 @@ export default function EventSettings() {
     endTime: '',
   });
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    console.log('Saving settings:', settings);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  useEffect(() => {
+    fetchEventSettings();
+  }, [eventId]);
+
+  const fetchEventSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await eventApi.getEventById(eventId);
+      
+      if (response.success) {
+        const event = response.data;
+        setSettings({
+          requireAccessCode: event.requireAccessCode,
+          accessCode: event.accessCode || '',
+          maxFileSize: event.maxFileSize,
+          allowAttendeeDownloads: event.allowAttendeeDownloads,
+          autoCloseEnabled: event.autoCloseEnabled,
+          endDate: event.endDate || '',
+          endTime: event.endTime || '',
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching settings:', err);
+      alert(err.message || 'Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const response = await eventApi.updateEvent(eventId, settings);
+      
+      if (response.success) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to save settings');
+      console.error('Error saving settings:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400 flex items-center justify-center">
+        <Loader className="w-12 h-12 text-white animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400">

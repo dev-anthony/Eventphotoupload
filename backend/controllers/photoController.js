@@ -1,0 +1,409 @@
+const Photo = require('../models/Photo');
+const Event = require('../models/Event');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads/photos');
+    
+    // Create directory if it doesn't exist
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, `photo-${uniqueSuffix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 20 * 1024 * 1024 // 20MB max (can be adjusted based on event settings)
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Upload photo(s)
+exports.uploadPhotos = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { contributorName } = req.body;
+
+    // Verify event exists and is active
+    const event = await Event.getById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    if (event.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'This event is no longer accepting uploads'
+      });
+    }
+
+    // Get or create session ID for attendee
+    let sessionId = req.session.attendeeId;
+    if (!sessionId) {
+      sessionId = `attendee-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      req.session.attendeeId = sessionId;
+    }
+
+    // Check if files were uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No files uploaded'
+      });
+    }
+
+    // Process each uploaded file
+    const uploadedPhotos = [];
+    for (const file of req.files) {
+      const photoData = {
+        eventId,
+        contributorName: contributorName || 'Anonymous',
+        contributorSessionId: sessionId,
+        fileName: file.originalname,
+        filePath: file.path,
+        fileSize: file.size,
+        mimeType: file.mimetype
+      };
+
+      const result = await Photo.create(photoData);
+      uploadedPhotos.push({
+        id: result.id,
+        fileName: file.originalname
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: `${uploadedPhotos.length} photo(s) uploaded successfully`,
+      data: {
+        photos: uploadedPhotos,
+        sessionId
+      }
+    });
+
+  } catch (error) {
+    console.error('Upload photos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error uploading photos',
+      error: error.message
+    });
+  }
+};
+
+// Get all photos for an event (for organizers and gallery view)
+exports.getEventPhotos = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Verify event exists
+    const event = await Event.getById(eventId);
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    // Get all photos
+    const photos = await Photo.getByEventId(eventId);
+
+    // Get current session ID
+    const currentSessionId = req.session.attendeeId || req.session.userId;
+
+    // Format response
+    const formattedPhotos = photos.map(photo => ({
+      id: photo.id,
+      contributor: photo.contributor_name,
+      fileName: photo.file_name,
+      url: `/api/photos/image/${photo.id}`,
+      uploadedAt: photo.uploaded_at,
+      isMine: currentSessionId && photo.contributor_session_id === currentSessionId
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        photos: formattedPhotos,
+        totalPhotos: photos.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Get event photos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching photos',
+      error: error.message
+    });
+  }
+};
+
+// Get user's own photos
+exports.getMyPhotos = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const sessionId = req.session.attendeeId || req.session.userId;
+
+    if (!sessionId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session not found'
+      });
+    }
+
+    const photos = await Photo.getBySessionId(eventId, sessionId);
+
+    const formattedPhotos = photos.map(photo => ({
+      id: photo.id,
+      contributor: photo.contributor_name,
+      fileName: photo.file_name,
+      url: `/api/photos/image/${photo.id}`,
+      uploadedAt: photo.uploaded_at,
+      isMine: true
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        photos: formattedPhotos,
+        totalPhotos: photos.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Get my photos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching photos',
+      error: error.message
+    });
+  }
+};
+
+// Serve photo image
+exports.getPhotoImage = async (req, res) => {
+  try {
+    const { photoId } = req.params;
+
+    const photo = await Photo.getById(photoId);
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo not found'
+      });
+    }
+
+    // Check if file exists
+    try {
+      await fs.access(photo.file_path);
+      res.sendFile(path.resolve(photo.file_path));
+    } catch (error) {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo file not found'
+      });
+    }
+
+  } catch (error) {
+    console.error('Get photo image error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving photo',
+      error: error.message
+    });
+  }
+};
+
+// Delete photo (organizer only)
+exports.deletePhoto = async (req, res) => {
+  try {
+    const { photoId } = req.params;
+    const userId = req.user?.id;
+
+    const photo = await Photo.getById(photoId);
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo not found'
+      });
+    }
+
+    // Check if user is organizer of the event
+    if (userId) {
+      const isOrganizer = await Event.isOrganizer(photo.event_id, userId);
+      if (!isOrganizer) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only the event organizer can delete photos'
+        });
+      }
+    } else {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Delete file from filesystem
+    try {
+      await fs.unlink(photo.file_path);
+    } catch (error) {
+      console.error('Error deleting file:', error);
+    }
+
+    // Delete from database
+    await Photo.delete(photoId);
+
+    res.json({
+      success: true,
+      message: 'Photo deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('Delete photo error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting photo',
+      error: error.message
+    });
+  }
+};
+
+// Download photo (for attendees - their own photos only)
+exports.downloadPhoto = async (req, res) => {
+  try {
+    const { photoId } = req.params;
+    const sessionId = req.session.attendeeId || req.session.userId;
+
+    const photo = await Photo.getById(photoId);
+    if (!photo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Photo not found'
+      });
+    }
+
+    // Check if event allows downloads
+    const event = await Event.getById(photo.event_id);
+    if (!event.allow_attendee_downloads) {
+      return res.status(403).json({
+        success: false,
+        message: 'Downloads are not allowed for this event'
+      });
+    }
+
+    // Check if photo belongs to user or user is organizer
+    const isOwner = photo.contributor_session_id === sessionId;
+    const isOrganizer = req.user && await Event.isOrganizer(photo.event_id, req.user.id);
+
+    if (!isOwner && !isOrganizer) {
+      return res.status(403).json({
+        success: false,
+        message: 'You can only download your own photos'
+      });
+    }
+
+    // Send file
+    res.download(photo.file_path, photo.file_name);
+
+  } catch (error) {
+    console.error('Download photo error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error downloading photo',
+      error: error.message
+    });
+  }
+};
+
+// Download all photos as ZIP (organizer only)
+exports.downloadAllPhotos = async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Check if user is organizer
+    const isOrganizer = await Event.isOrganizer(eventId, userId);
+    if (!isOrganizer) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the event organizer can download all photos'
+      });
+    }
+
+    const event = await Event.getById(eventId);
+    const photos = await Photo.getByEventId(eventId);
+
+    if (photos.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No photos to download'
+      });
+    }
+
+    // Create ZIP file
+    const archiver = require('archiver');
+    const archive = archiver('zip', {
+      zlib: { level: 9 }
+    });
+
+    res.attachment(`${event.name}-photos.zip`);
+    archive.pipe(res);
+
+    // Add photos to archive
+    for (const photo of photos) {
+      try {
+        await fs.access(photo.file_path);
+        archive.file(photo.file_path, { name: photo.file_name });
+      } catch (error) {
+        console.error(`File not found: ${photo.file_path}`);
+      }
+    }
+
+    archive.finalize();
+
+  } catch (error) {
+    console.error('Download all photos error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error creating download',
+      error: error.message
+    });
+  }
+};
+
+// Export multer upload middleware
+exports.upload = upload;
