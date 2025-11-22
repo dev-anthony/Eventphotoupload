@@ -136,6 +136,20 @@ export default function Dashboard() {
       console.error('Error creating event:', err);
     }
   };
+  const handleDeleteEvent = async (eventId) =>{
+    try{
+
+      const response = await eventApi.deleteEvent(eventId)
+        if (response.success) {
+          // Refresh events list
+          await fetchEvents();
+          alert('deleted');
+    }
+  }catch (err) {
+      alert(err.message || 'Failed to delete event');
+      console.error('Error deleting event:', err);
+    }
+}
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-pink-500 to-orange-400">
@@ -186,7 +200,7 @@ export default function Dashboard() {
           events.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {events.map((event) => (
-                <EventCard key={event.id} event={event} />
+                <EventCard key={event.id} event={event}  onDelete={handleDeleteEvent}/>
               ))}
             </div>
           ) : (

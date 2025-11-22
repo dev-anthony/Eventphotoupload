@@ -1,8 +1,8 @@
 import React from 'react';
-import { Calendar, Image, Users, ExternalLink, Settings } from 'lucide-react';
+import { Calendar, Image, Users, ExternalLink, Settings, LucideDelete } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function EventCard({ event }) {
+export default function EventCard({ event, onDelete }) {
   const navigate = useNavigate();
 
   return (
@@ -57,6 +57,12 @@ export default function EventCard({ event }) {
           className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-2xl transition"
         >
           <Settings className="w-5 h-5" />
+        </button>
+        <button
+          onClick={() => onDelete(event.id)}
+          className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-2xl transition"
+        >
+          <LucideDelete className="w-5 h-5" />
         </button>
       </div>
     </div>

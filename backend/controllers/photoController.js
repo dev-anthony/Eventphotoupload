@@ -1,3 +1,6 @@
+// ============================================
+// FILE: controllers/photoController.js - FIXED
+// ============================================
 const Photo = require('../models/Photo');
 const Event = require('../models/Event');
 const multer = require('multer');
@@ -9,7 +12,6 @@ const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
     const uploadDir = path.join(__dirname, '../uploads/photos');
     
-    // Create directory if it doesn't exist
     try {
       await fs.mkdir(uploadDir, { recursive: true });
       cb(null, uploadDir);
@@ -18,7 +20,6 @@ const storage = multer.diskStorage({
     }
   },
   filename: (req, file, cb) => {
-    // Generate unique filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     cb(null, `photo-${uniqueSuffix}${ext}`);
@@ -28,10 +29,9 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: 20 * 1024 * 1024 // 20MB max (can be adjusted based on event settings)
+    fileSize: 20 * 1024 * 1024 // 20MB max
   },
   fileFilter: (req, file, cb) => {
-    // Accept only image files
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
     } else {
@@ -40,15 +40,30 @@ const upload = multer({
   }
 });
 
-// Upload photo(s)
+// Upload photo(s) - FIXED TO HANDLE SHARE LINK
 exports.uploadPhotos = async (req, res) => {
   try {
-    const { eventId } = req.params;
+    const { eventId } = req.params; // This could be either ID or shareLink
     const { contributorName } = req.body;
 
-    // Verify event exists and is active
-    const event = await Event.getById(eventId);
+    console.log('Upload attempt for eventId/shareLink:', eventId);
+
+    // Try to get event - check if it's a share link or numeric ID
+    let event;
+    
+    // Check if eventId is numeric (actual ID) or alphanumeric (share link)
+    if (isNaN(eventId)) {
+      // It's a share link
+      event = await Event.getByShareLink(eventId);
+      console.log('Looked up by share link:', eventId);
+    } else {
+      // It's a numeric ID
+      event = await Event.getById(eventId);
+      console.log('Looked up by ID:', eventId);
+    }
+
     if (!event) {
+      console.log('Event not found for:', eventId);
       return res.status(404).json({
         success: false,
         message: 'Event not found'
@@ -69,6 +84,8 @@ exports.uploadPhotos = async (req, res) => {
       req.session.attendeeId = sessionId;
     }
 
+    console.log('Session ID:', sessionId);
+
     // Check if files were uploaded
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -77,11 +94,13 @@ exports.uploadPhotos = async (req, res) => {
       });
     }
 
+    console.log('Files received:', req.files.length);
+
     // Process each uploaded file
     const uploadedPhotos = [];
     for (const file of req.files) {
       const photoData = {
-        eventId,
+        eventId: event.id, // Use the actual event ID from database
         contributorName: contributorName || 'Anonymous',
         contributorSessionId: sessionId,
         fileName: file.originalname,
@@ -96,6 +115,8 @@ exports.uploadPhotos = async (req, res) => {
         fileName: file.originalname
       });
     }
+
+    console.log('Photos uploaded successfully:', uploadedPhotos.length);
 
     res.status(201).json({
       success: true,
@@ -116,13 +137,19 @@ exports.uploadPhotos = async (req, res) => {
   }
 };
 
-// Get all photos for an event (for organizers and gallery view)
+// Get all photos for an event - FIXED TO HANDLE SHARE LINK
 exports.getEventPhotos = async (req, res) => {
   try {
     const { eventId } = req.params;
 
-    // Verify event exists
-    const event = await Event.getById(eventId);
+    // Try to get event - check if it's a share link or numeric ID
+    let event;
+    if (isNaN(eventId)) {
+      event = await Event.getByShareLink(eventId);
+    } else {
+      event = await Event.getById(eventId);
+    }
+
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -130,8 +157,8 @@ exports.getEventPhotos = async (req, res) => {
       });
     }
 
-    // Get all photos
-    const photos = await Photo.getByEventId(eventId);
+    // Get all photos using actual event ID
+    const photos = await Photo.getByEventId(event.id);
 
     // Get current session ID
     const currentSessionId = req.session.attendeeId || req.session.userId;
@@ -164,7 +191,7 @@ exports.getEventPhotos = async (req, res) => {
   }
 };
 
-// Get user's own photos
+// Get user's own photos - FIXED TO HANDLE SHARE LINK
 exports.getMyPhotos = async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -177,7 +204,22 @@ exports.getMyPhotos = async (req, res) => {
       });
     }
 
-    const photos = await Photo.getBySessionId(eventId, sessionId);
+    // Try to get event - check if it's a share link or numeric ID
+    let event;
+    if (isNaN(eventId)) {
+      event = await Event.getByShareLink(eventId);
+    } else {
+      event = await Event.getById(eventId);
+    }
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: 'Event not found'
+      });
+    }
+
+    const photos = await Photo.getBySessionId(event.id, sessionId);
 
     const formattedPhotos = photos.map(photo => ({
       id: photo.id,
@@ -219,7 +261,6 @@ exports.getPhotoImage = async (req, res) => {
       });
     }
 
-    // Check if file exists
     try {
       await fs.access(photo.file_path);
       res.sendFile(path.resolve(photo.file_path));
@@ -254,7 +295,6 @@ exports.deletePhoto = async (req, res) => {
       });
     }
 
-    // Check if user is organizer of the event
     if (userId) {
       const isOrganizer = await Event.isOrganizer(photo.event_id, userId);
       if (!isOrganizer) {
@@ -270,14 +310,12 @@ exports.deletePhoto = async (req, res) => {
       });
     }
 
-    // Delete file from filesystem
     try {
       await fs.unlink(photo.file_path);
     } catch (error) {
       console.error('Error deleting file:', error);
     }
 
-    // Delete from database
     await Photo.delete(photoId);
 
     res.json({
@@ -295,7 +333,7 @@ exports.deletePhoto = async (req, res) => {
   }
 };
 
-// Download photo (for attendees - their own photos only)
+// Download photo
 exports.downloadPhoto = async (req, res) => {
   try {
     const { photoId } = req.params;
@@ -309,7 +347,6 @@ exports.downloadPhoto = async (req, res) => {
       });
     }
 
-    // Check if event allows downloads
     const event = await Event.getById(photo.event_id);
     if (!event.allow_attendee_downloads) {
       return res.status(403).json({
@@ -318,7 +355,6 @@ exports.downloadPhoto = async (req, res) => {
       });
     }
 
-    // Check if photo belongs to user or user is organizer
     const isOwner = photo.contributor_session_id === sessionId;
     const isOrganizer = req.user && await Event.isOrganizer(photo.event_id, req.user.id);
 
@@ -329,7 +365,6 @@ exports.downloadPhoto = async (req, res) => {
       });
     }
 
-    // Send file
     res.download(photo.file_path, photo.file_name);
 
   } catch (error) {
@@ -342,7 +377,7 @@ exports.downloadPhoto = async (req, res) => {
   }
 };
 
-// Download all photos as ZIP (organizer only)
+// Download all photos as ZIP
 exports.downloadAllPhotos = async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -355,7 +390,6 @@ exports.downloadAllPhotos = async (req, res) => {
       });
     }
 
-    // Check if user is organizer
     const isOrganizer = await Event.isOrganizer(eventId, userId);
     if (!isOrganizer) {
       return res.status(403).json({
@@ -374,7 +408,6 @@ exports.downloadAllPhotos = async (req, res) => {
       });
     }
 
-    // Create ZIP file
     const archiver = require('archiver');
     const archive = archiver('zip', {
       zlib: { level: 9 }
@@ -383,7 +416,6 @@ exports.downloadAllPhotos = async (req, res) => {
     res.attachment(`${event.name}-photos.zip`);
     archive.pipe(res);
 
-    // Add photos to archive
     for (const photo of photos) {
       try {
         await fs.access(photo.file_path);
@@ -405,5 +437,4 @@ exports.downloadAllPhotos = async (req, res) => {
   }
 };
 
-// Export multer upload middleware
 exports.upload = upload;
