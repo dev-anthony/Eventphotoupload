@@ -80,7 +80,7 @@ export default function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    axios.post('http://localhost:5000/api/auth/logout')
+    axios.post('https://event-photo-api.onrender.com/api/auth/logout')
       .then(() => {
         setUser(null);
         navigate('/login');

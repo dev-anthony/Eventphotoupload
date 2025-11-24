@@ -15,7 +15,7 @@ const app = express();
 //   credentials: true
 // }));
 app.use(cors({
-  origin: 'https://event-photo-app.onrender.com', // your frontend Render URL
+  origin: 'https://event-photo-app-y2y9.onrender.com', // your frontend Render URL
   credentials: true
 }));
 app.use(express.json());
