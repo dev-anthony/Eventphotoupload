@@ -73,7 +73,7 @@ export default function Navbar() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/auth/me')
+    axios.get('https://event-photo-api.onrender.com/api/auth/me')
       .then(res => {
         if (res.data.loggedIn) setUser(res.data.username);
       });
