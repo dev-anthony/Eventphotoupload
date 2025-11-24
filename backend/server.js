@@ -72,9 +72,12 @@ const app = express();
 // ------------------------
 // CORS - allow frontend to talk to backend
 // ------------------------
+// server.js - UPDATE CORS
 app.use(cors({
-  origin: 'https://event-photo-app-y2y9.onrender.com', // e.g., https://event-photo-app-y2y9.onrender.com
-  credentials: true
+  origin: 'https://event-photo-app-y2y9.onrender.com', // Your exact frontend URL
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // ------------------------
@@ -82,20 +85,24 @@ app.use(cors({
 // ------------------------
 
 
+
+// server.js - Session config
+// In your main server.js file
 app.use(session({
   key: 'session_cookie_name',
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || 'fallback-secret-change-in-prod',
   store: sessionStore,
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    secure: true,      // must be true for HTTPS (Render uses HTTPS)
-    sameSite: 'none',  // allows cross-origin cookies
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    secure: true,           // Required for cross-site on HTTPS
+    sameSite: 'none',       // THIS IS THE KEY — allows cross-origin
+    maxAge: 24 * 60 * 60 * 1000,
+    domain: undefined,      // Let browser decide (important!)
+    path: '/'
   }
 }));
-
 // ------------------------
 // Middleware
 // ------------------------
