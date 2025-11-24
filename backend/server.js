@@ -62,7 +62,10 @@ require('dotenv').config();
 const eventRoutes = require('./routes/eventRoutes');
 const authRoutes = require('./routes/authRoutes');
 const photoRoutes = require('./routes/photoRoutes');
-const pool = require('./db'); // your mysql2 pool
+const pool = require('./db');
+
+const sessionStore = new MySQLStore({}, pool); // <- pass the plain pool
+
 
 const app = express();
 
@@ -77,7 +80,7 @@ app.use(cors({
 // ------------------------
 // Session store in MySQL (persistent for production)
 // ------------------------
-const sessionStore = new MySQLStore({}, pool.promise());
+
 
 app.use(session({
   key: 'session_cookie_name',
