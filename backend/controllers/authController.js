@@ -25,6 +25,42 @@ const register = async (req, res) => {
   }
 };
 
+// const login = async (req, res) => {
+//   const { email, password } = req.body;
+
+//   if (!email || !password) {
+//     return res.status(400).json({ message: 'Email and password required' });
+//   }
+
+//   try {
+//     const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+//     const user = rows[0];
+
+//     if (!user) {
+//       return res.status(401).json({ message: 'Invalid credentials' });
+//     }
+
+//     const match = await bcrypt.compare(password, user.password);
+//     if (!match) {
+//       return res.status(401).json({ message: 'Invalid credentials' });
+//     }
+
+//   // ✅ Set session
+//     req.session.userId = user.id;
+//     req.session.username = user.username;
+
+//     // ✅ Save session before sending response
+//     req.session.save((err) => {
+//       if (err) {
+//         console.error('Session save error:', err);
+//         return res.status(500).json({ message: 'Session error' });
+//       }
+
+//     res.json({ message: 'Login successful', username: user.username });
+//   } catch (err) {
+//     res.status(500).json({ message: 'Server error' });
+//   }
+// };
 const login = async (req, res) => {
   const { email, password } = req.body;
 
@@ -45,11 +81,21 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // ✅ Set session
     req.session.userId = user.id;
     req.session.username = user.username;
 
-    res.json({ message: 'Login successful', username: user.username });
+    // ✅ Save session before sending response
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ message: 'Session error' });
+      }
+
+      res.json({ message: 'Login successful', username: user.username });
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 };
