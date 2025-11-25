@@ -2,24 +2,23 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { Camera, LogIn, UserPlus, Mail, Lock, User } from 'lucide-react';
+import { Camera, LogIn, Mail, Lock, Loader } from 'lucide-react';
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setLoading(true);
        const res = await axios.post('https://event-photo-api.onrender.com/api/auth/login', form, {
       withCredentials: true, 
     });
 
     setMessage('Login successful!');
-
-    setTimeout(() => {
-      navigate('/dashboard');   
-    }, 1000);
+    navigate('/dashboard');   
       
     } catch (err) {
       setMessage(err.response?.data?.message || 'Login failed');
@@ -73,6 +72,11 @@ export default function Login() {
                 />
               </div>
             </div>
+              {loading && (
+                      <div className="flex justify-center items-center py-20">
+                        <Loader className="w-12 h-12 text-white animate-spin" />
+                      </div>
+                    )}
 
             {/* Message Display */}
             {message && (
