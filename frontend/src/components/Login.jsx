@@ -79,7 +79,7 @@ export default function Login() {
                     )}
 
             {/* Message Display */}
-            {message && (
+            {message && !loading && (
               <div className={`p-4 rounded-2xl text-center font-medium ${
                 message.includes('successful') 
                   ? 'bg-green-400/30 text-white' 
