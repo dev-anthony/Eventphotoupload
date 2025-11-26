@@ -249,30 +249,90 @@ exports.getMyPhotos = async (req, res) => {
 };
 
 // Serve photo image
+// exports.getPhotoImage = async (req, res) => {
+//   try {
+//     const { photoId } = req.params;
+
+//     const photo = await Photo.getById(photoId);
+//     if (!photo) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Photo not found'
+//       });
+//     }
+
+//     try {
+//       await fs.access(photo.file_path);
+//       res.sendFile(path.resolve(photo.file_path));
+//     } catch (error) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'Photo file not found'
+//       });
+//     }
+
+//   } catch (error) {
+//     console.error('Get photo image error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Error retrieving photo',
+//       error: error.message
+//     });
+//   }
+// };
+// Serve photo image - UPDATED WITH BETTER LOGGING
 exports.getPhotoImage = async (req, res) => {
   try {
     const { photoId } = req.params;
+    
+    console.log('=== PHOTO IMAGE REQUEST ===');
+    console.log('Photo ID:', photoId);
 
     const photo = await Photo.getById(photoId);
     if (!photo) {
+      console.log('❌ Photo not found in database');
       return res.status(404).json({
         success: false,
         message: 'Photo not found'
       });
     }
 
+    console.log('✓ Photo found:', {
+      id: photo.id,
+      fileName: photo.file_name,
+      filePath: photo.file_path,
+      uploadedAt: photo.uploaded_at
+    });
+
+    // Check if file exists
     try {
       await fs.access(photo.file_path);
+      console.log('✓ File exists on disk');
+      
+      // Set proper headers
+      res.setHeader('Content-Type', photo.mime_type || 'image/jpeg');
+      res.setHeader('Content-Disposition', `inline; filename="${photo.file_name}"`);
+      
+      // Send the file
       res.sendFile(path.resolve(photo.file_path));
-    } catch (error) {
+    } catch (fileError) {
+      console.error('❌ File not found on disk:', photo.file_path);
+      console.error('File error:', fileError.message);
+      
       return res.status(404).json({
         success: false,
-        message: 'Photo file not found'
+        message: 'Photo file not found on server',
+        debug: process.env.NODE_ENV === 'development' ? {
+          photoId,
+          fileName: photo.file_name,
+          expectedPath: photo.file_path,
+          error: fileError.message
+        } : undefined
       });
     }
 
   } catch (error) {
-    console.error('Get photo image error:', error);
+    console.error('❌ Get photo image error:', error);
     res.status(500).json({
       success: false,
       message: 'Error retrieving photo',

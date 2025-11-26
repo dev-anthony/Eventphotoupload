@@ -45,9 +45,28 @@ app.use(session({
 }));
 
 // 4. Create uploads folder if missing
+// const uploadsDir = path.join(__dirname, 'uploads/photos');
+// if (!fs.existsSync(uploadsDir)) {
+//   fs.mkdirSync(uploadsDir, { recursive: true });
+// }
+// 4. Create uploads folder if missing - UPDATED
 const uploadsDir = path.join(__dirname, 'uploads/photos');
+console.log('Uploads directory:', uploadsDir);
+
 if (!fs.existsSync(uploadsDir)) {
+  console.log('Creating uploads directory...');
   fs.mkdirSync(uploadsDir, { recursive: true });
+  console.log('✓ Uploads directory created');
+} else {
+  console.log('✓ Uploads directory exists');
+}
+
+// Log all files in uploads (for debugging)
+try {
+  const files = fs.readdirSync(uploadsDir);
+  console.log('Files in uploads:', files.length);
+} catch (err) {
+  console.log('Could not read uploads directory:', err.message);
 }
 
 // 5. Serve uploaded photos statically
